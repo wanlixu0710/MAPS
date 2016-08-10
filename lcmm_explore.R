@@ -1,0 +1,8 @@
+setwd("~/R_directory/MAPS/6_14_16_data/")
+library(gridExtra)
+library(grid)
+library(ggplot2)
+library(lcmm)
+library(plyr)
+library(dplyr)
+rm(list=ls())
