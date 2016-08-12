@@ -29,7 +29,7 @@ a.div.30 <- subset(a.div, as.numeric(PNA)<31)
 
 ## demo, nnns
 demo <- read.csv(file="MAPS demographic data_3_11_16.csv")
-demo <- demo[,c("Subject_ID", "BIrth_GA", "Gender", "Baby_Race", "Delivery", "PROM", "Twins", "Birth_weight", "SNAPEII")]
+demo <- demo[,c("Subject_ID", "BIrth_GA", "female", "Baby_Race", "vaginal", "PROM", "Twins", "Birth_weight", "SNAPEII")]
 demo$Subject_ID <- as.character(demo$Subject_ID)
 nnns <- read.csv(file="NNNS_final_8_25_15.csv")
 nnns$Subject_ID <- as.character(nnns$Subject_ID)
@@ -44,7 +44,7 @@ count <- feeding %>% filter(as.numeric(PNA)<31) %>% group_by(Subject_ID,PNA)%>%s
 count <- count %>% mutate(pmbm=summbm/(summbm+sumdbm+sumformula),pdbm=sumdbm/(summbm+sumdbm+sumformula),pform=sumformula/(summbm+sumdbm+sumformula))
 a.div.30 <- inner_join(a.div.30, count[,c("Subject_ID", "PNA", "pmbm","pdbm","pform")])
 
-count2 <- feeding %>% filter(as.numeric(PNA)<11) %>%group_by(Subject_ID)%>%summarise(summbm=sum(MBM, na.rm=TRUE), sumdbm=sum(DBM, na.rm=TRUE), sumformula=sum(Formula, na.rm=TRUE))
+count2 <- feeding %>% filter(as.numeric(PNA)<10) %>%group_by(Subject_ID)%>%summarise(summbm=sum(MBM, na.rm=TRUE), sumdbm=sum(DBM, na.rm=TRUE), sumformula=sum(Formula, na.rm=TRUE))
 count2 <- count2 %>% mutate(pmbm.10=summbm/(summbm+sumdbm+sumformula),pdbm.10=sumdbm/(summbm+sumdbm+sumformula),pform.10=sumformula/(summbm+sumdbm+sumformula)) 
 
 count2$FT.10[count2$pmbm.10>=count2$pdbm.10 & count2$pmbm.10>=count2$pform.10] <- "mbm"
@@ -52,6 +52,15 @@ count2$FT.10[count2$pdbm.10>count2$pmbm.10 & count2$pdbm.10>count2$pform.10] <- 
 count2$FT.10[count2$pform.10>count2$pmbm.10 & count2$pform.10 >count2$pdbm.10] <- "formula"
 count2 <- select(count2, Subject_ID, pmbm.10, pdbm.10, pform.10,FT.10)
 a.div.30 <- left_join(a.div.30, count2)
+
+count3 <- feeding %>% filter(as.numeric(PNA)<15) %>%group_by(Subject_ID)%>%summarise(summbm=sum(MBM, na.rm=TRUE), sumdbm=sum(DBM, na.rm=TRUE), sumformula=sum(Formula, na.rm=TRUE))
+count3 <- count3 %>% mutate(pmbm.15=summbm/(summbm+sumdbm+sumformula),pdbm.15=sumdbm/(summbm+sumdbm+sumformula),pform.15=sumformula/(summbm+sumdbm+sumformula)) 
+
+count3$FT.15[count3$pmbm.15>=count3$pdbm.15 & count3$pmbm.15>=count3$pform.15] <- "mbm"
+count3$FT.15[count3$pdbm.15>count3$pmbm.15 & count3$pdbm.15>count3$pform.15] <- "dbm"
+count3$FT.15[count3$pform.15>count3$pmbm.15 & count3$pform.15 >count3$pdbm.15] <- "formula"
+count3 <- select(count3, Subject_ID, pmbm.15, pdbm.15, pform.15,FT.15)
+a.div.30 <- left_join(a.div.30, count3)
 
 ## antibiotics use, the first 10 days
 anti <- read.csv(file="Daily_antibiotic.40.50.csv")
@@ -71,16 +80,92 @@ a.div.30 <- left_join(a.div.30,niss.daily)
 
 a.div.30$PNA <- as.numeric(a.div.30$PNA)
 ####---------------------LCMM  modeling -----------------------------
-### PNA Feeding,first 10 days percentage
-
-m1mom <- hlme(simpson~PNA+pmbm,random=~PNA,subject='Subject_ID',ng=1,data=a.div.30, cor="AR"(PNA), maxiter=5e3)
+### PNA 
+m1mom <- hlme(simpson~PNA,random=~PNA,subject='Subject_ID',ng=1,data=a.div.30, cor="AR"(PNA), maxiter=5e3)
 summary(m1mom)
 
-m2mom<-hlme(simpson~PNA+pmbm,random=~PNA,mixture=~PNA,classmb=~pmbm.10, cor="AR"(PNA),subject='Subject_ID',ng=2,data=a.div.30,B=m1mom)
+m2mom<-hlme(simpson~PNA,random=~PNA,mixture=~PNA, cor="AR"(PNA),subject='Subject_ID',ng=2,data=a.div.30,B=m1mom)
 summary(m2mom)
 
 people1 <- as.data.frame(m2mom$pprob[,1:2])
 fd1 <- left_join(a.div.30, people1)
 p1 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_line() + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=F)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p1
 p2 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_smooth(aes(group=Subject_ID, colour=as.character(fd1$class)),size=0.5, se=F) + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=T)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p2
+
+### PNA + gender 
+m1mom <- hlme(simpson~PNA*female,random=~PNA,subject='Subject_ID',ng=1,data=a.div.30, cor="AR"(PNA), maxiter=5e3)
+summary(m1mom)
+
+m2mom<-hlme(simpson~PNA*female,random=~PNA,mixture=~PNA, classmb=~female, cor="AR"(PNA),subject='Subject_ID',ng=2,data=a.div.30,B=m1mom)
+summary(m2mom)
+
+people1 <- as.data.frame(m2mom$pprob[,1:2])
+fd1 <- left_join(a.div.30, people1)
+p1 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_line() + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=F)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p1
+p2 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_smooth(aes(group=Subject_ID, colour=as.character(fd1$class)),size=0.5, se=F) + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=T)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p2
+
+### PNA * first 10 days feeding
+a.div.30$ft.10.mom <- ifelse(a.div.30$FT.10=="mbm","mbm","nonmbm")
+m1mom <- hlme(simpson~PNA * ft.10.mom,random=~PNA,subject='Subject_ID',ng=1,data=a.div.30, cor="AR"(PNA), maxiter=5e3)
+summary(m1mom)
+
+m2mom<-hlme(simpson~PNA * ft.10.mom,random=~PNA,mixture=~PNA, cor="AR"(PNA),subject='Subject_ID',ng=2,data=a.div.30,B=m1mom)
+summary(m2mom)
+
+people1 <- as.data.frame(m2mom$pprob[,1:2])
+fd1 <- left_join(a.div.30, people1)
+p1 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_line() + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=F)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p1
+p2 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_smooth(aes(group=Subject_ID, colour=as.character(fd1$class)),size=0.5, se=F) + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=T)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p2
+
+### PNA * first 15 days feeding
+a.div.30$ft.15.mom <- ifelse(a.div.30$FT.15=="mbm","mbm","nonmbm")
+m1mom <- hlme(simpson~PNA*ft.15.mom,random=~PNA,subject='Subject_ID',ng=1,data=a.div.30, cor="AR"(PNA), maxiter=5e3)
+summary(m1mom)
+
+m2mom<-hlme(simpson~PNA*ft.15.mom,random=~PNA,mixture=~PNA, cor="AR"(PNA),subject='Subject_ID',ng=2,data=a.div.30,B=m1mom)
+summary(m2mom)
+
+people1 <- as.data.frame(m2mom$pprob[,1:2])
+fd1 <- left_join(a.div.30, people1)
+p1 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_line() + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=F)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p1
+p2 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_smooth(aes(group=Subject_ID, colour=as.character(fd1$class)),size=0.5, se=F) + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=T)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p2
+
+### PNA + daily feeding, percentage of mbm
+m1mom <- hlme(simpson~PNA+pmbm,random=~PNA,subject='Subject_ID',ng=1,data=a.div.30, cor="AR"(PNA), maxiter=5e3)
+summary(m1mom)
+
+m2mom<-hlme(simpson~PNA+pmbm,random=~PNA,mixture=~PNA, cor="AR"(PNA),subject='Subject_ID',ng=2,data=a.div.30,B=m1mom)
+summary(m2mom)
+
+people1 <- as.data.frame(m2mom$pprob[,1:2])
+fd1 <- left_join(a.div.30, people1)
+p1 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_line() + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=F)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p1
+p2 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_smooth(aes(group=Subject_ID, colour=as.character(fd1$class)),size=0.5, se=F) + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=T)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p2
+
+### PNA + antibiotics first 10 days
+m1mom <- hlme(simpson~PNA+anti.10,random=~PNA,subject='Subject_ID',ng=1,data=a.div.30, cor="AR"(PNA), maxiter=5e3)
+summary(m1mom)
+
+m2mom<-hlme(simpson~PNA+anti.10,random=~PNA,mixture=~PNA, cor="AR"(PNA),subject='Subject_ID',ng=2,data=a.div.30,B=m1mom)
+summary(m2mom)
+
+people1 <- as.data.frame(m2mom$pprob[,1:2])
+fd1 <- left_join(a.div.30, people1)
+p1 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_line() + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=F)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p1
+p2 <- ggplot(fd1, aes(PNA, simpson, group=Subject_ID, colour=as.character(fd1$class))) + geom_smooth(aes(group=Subject_ID, colour=as.character(fd1$class)),size=0.5, se=F) + geom_smooth(aes(group=as.character(fd1$class)), method="loess", size=2, se=T)  + scale_y_continuous(limits = c(0,1)) + labs(x="PNA",y="simpson",colour="Latent Class");p2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
